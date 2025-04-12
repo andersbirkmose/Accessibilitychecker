@@ -1,0 +1,18 @@
+# Build
+bin/
+obj/
+
+# User secrets & temp
+*.user
+*.suo
+appsettings.Development.json
+
+# CSV-rapporter
+*.csv
+
+# IDE
+.vscode/
+.idea/
+
+# Publish
+publish/
