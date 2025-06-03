@@ -84,7 +84,8 @@ public class AccessibilityAnalyzer
                         Rule = violation.GetProperty("id").GetString() ?? "",
                         Description = violation.GetProperty("help").GetString() ?? "",
                         Impact = violation.GetProperty("impact").GetString() ?? "",
-                        AffectedNodes = violation.GetProperty("nodes").GetArrayLength()
+                        AffectedNodes = violation.GetProperty("nodes").GetArrayLength(),
+                    HelpUrl = violation.GetProperty("helpUrl").GetString() ?? ""
                     });
                 }
             }

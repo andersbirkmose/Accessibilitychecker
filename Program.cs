@@ -8,10 +8,16 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Playwright;
 
+
+
 var builder = Host.CreateApplicationBuilder(args);
+
+// Tilføj secrets.json efter appsettings.json (hvis den findes)
+builder.Configuration.AddJsonFile("secrets.json", optional: true, reloadOnChange: true);
 
 // Konfiguration og services
 builder.Services.Configure<AppSettings>(builder.Configuration);
+
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddSingleton<AccessibilityAnalyzer>();
 builder.Services.AddSingleton<CrawlerService>();

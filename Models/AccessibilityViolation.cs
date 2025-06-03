@@ -7,4 +7,6 @@ public class AccessibilityViolation
     public string Description { get; set; } = string.Empty;
     public string Impact { get; set; } = string.Empty;
     public int AffectedNodes { get; set; }
+
+    public string HelpUrl { get; set; } = string.Empty;
 }

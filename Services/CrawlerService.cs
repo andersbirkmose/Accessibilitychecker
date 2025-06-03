@@ -27,7 +27,13 @@ public class CrawlerService
     {
         var normalizedUrl = UrlHelper.NormalizeUrl(url);
 
-        if (depth > _settings.MaxDepth || visited.Contains(normalizedUrl) || IsExcluded(normalizedUrl))
+        if (depth > _settings.MaxDepth 
+            || visited.Contains(normalizedUrl) 
+            || IsExcluded(normalizedUrl) 
+            || ExcludeFiles.IsFileUrl(normalizedUrl))
+            return;
+
+        if (visited.Count >= _settings.MaxPages)
             return;
 
         visited.Add(normalizedUrl);
@@ -61,11 +67,13 @@ public class CrawlerService
             foreach (var link in hrefs)
             {
                 var normalizedLink = UrlHelper.NormalizeUrl(link);
-                if (normalizedLink.StartsWith(_settings.TargetDomain))
+                if (normalizedLink.StartsWith(_settings.TargetDomain)
+                    && !ExcludeFiles.IsFileUrl(normalizedLink))
                 {
                     await CrawlAsync(normalizedLink, browser, visited, depth + 1);
                 }
             }
+
         }
         catch (Exception ex)
         {
