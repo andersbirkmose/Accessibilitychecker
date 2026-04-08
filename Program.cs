@@ -72,7 +72,7 @@ var domainName = new Uri(settings.TargetDomain).Host;
 var dateStamp = DateTime.Now.ToString("yyyy-MM-dd");
 var violationsCsvFile = $"violations-{domainName}-{dateStamp}.csv";
 var skippedCsvFile = $"skipped-{domainName}-{dateStamp}.csv";
-var summaryCsvFile = $"summary-{domainName}-{dateStamp}.csv";
+var summaryHtmlFile = $"summary-{domainName}-{dateStamp}.html";
 var attachments = new List<string>();
 
 // Eksportér violations
@@ -89,9 +89,9 @@ if (violations.Any())
 
     attachments.Add(violationsCsvFile);
 
-    // Generer opsummering
-    summaryService.GenerateSummary(violationsCsvFile, summaryCsvFile);
-    attachments.Add(summaryCsvFile);
+    // Generer HTML-rapport
+    summaryService.GenerateHtmlReport(violationsCsvFile, summaryHtmlFile);
+    attachments.Add(summaryHtmlFile);
 }
 else
 {
@@ -126,10 +126,10 @@ if (attachments.Any())
         Antal tilgængelighedsfejl fundet: {violations.Count}
         Antal sider sprunget over: {crawler.SkippedPages.Count}
 
-        Vedhæftede CSV-filer:
-        - {Path.GetFileName(violationsCsvFile)}
-        - {Path.GetFileName(summaryCsvFile)}
-        - {Path.GetFileName(skippedCsvFile)}
+        Vedhæftede filer:
+        - {Path.GetFileName(violationsCsvFile)} (alle fejl)
+        - {Path.GetFileName(summaryHtmlFile)} (HTML-opsummering)
+        - {Path.GetFileName(skippedCsvFile)} (oversprungne sider)
 
         Mvh,
         Din automatiske WCAG-scanner
@@ -137,7 +137,7 @@ if (attachments.Any())
 }
 else
 {
-    Console.WriteLine("📭 Ingen CSV-filer genereret – e-mail springes over.");
+    Console.WriteLine("📭 Ingen filer genereret – e-mail springes over.");
 }
 
 Console.WriteLine("🏁 Crawling afsluttet.");
