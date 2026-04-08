@@ -79,16 +79,89 @@ namespace AccessibilityChecker.Services
             sb.AppendLine("        tr:nth-child(even) { background: #f2f2f2; }");
             sb.AppendLine("        .total-box { background: #e8f4fc; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; }");
             sb.AppendLine("        .total-number { font-size: 2em; font-weight: bold; color: #2c3e50; }");
-            sb.AppendLine("        .chart-container { height: 300px; margin: 20px 0; }");
+            sb.AppendLine("        .progress-container { height: 30px; background: #ecf0f1; border-radius: 4px; margin: 10px 0; }");
+            sb.AppendLine("        .progress-bar { height: 100%; border-radius: 4px; }");
+            sb.AppendLine("        .progress-critical { background: #e74c3c; }");
+            sb.AppendLine("        .progress-serious { background: #f39c12; }");
+            sb.AppendLine("        .progress-moderate { background: #3498db; }");
+            sb.AppendLine("        .impact-label { font-weight: bold; }");
             sb.AppendLine("    </style>");
             sb.AppendLine("</head>");
             sb.AppendLine("<body>");
             sb.AppendLine("    <h1>WCAG Tilgængelighedsrapport - Opsummering</h1>");
             
-            // Totaler
+            // Overblik
             sb.AppendLine("    <div class='summary-card'>");
             sb.AppendLine("        <h2>Overblik</h2>");
             sb.AppendLine("        <div style='display: flex; justify-content: space-around;'>");
             sb.AppendLine("            <div class='total-box'>");
             sb.AppendLine("                <div>Antal fejl i alt</div>");
-            sb.AppendLine($
+            sb.AppendLine($"                <div class='total-number'>{totalViolations}</div>");
+            sb.AppendLine("            </div>");
+            sb.AppendLine("            <div class='total-box'>");
+            sb.AppendLine("                <div>Antal sider analyseret</div>");
+            sb.AppendLine($"                <div class='total-number'>{totalPages}</div>");
+            sb.AppendLine("            </div>");
+            sb.AppendLine("        </div>");
+            sb.AppendLine("    </div>");
+            
+            // Fordeling efter impact
+            sb.AppendLine("    <div class='summary-card'>");
+            sb.AppendLine("        <h2>Fejl fordelt på Impact</h2>");
+            foreach (var impact in summaryByImpact)
+            {
+                var percentage = (double)impact.Count / totalViolations * 100;
+                var className = impact.Impact.ToLower();
+                sb.AppendLine($"        <div style='margin: 10px 0;'>");
+                sb.AppendLine($"            <div class='impact-label'>{impact.Impact.ToUpper()}: {impact.Count} fejl</div>");
+                sb.AppendLine($"            <div class='progress-container'>");
+                sb.AppendLine($"                <div class='progress-bar progress-{className}' style='width: {percentage}%'></div>");
+                sb.AppendLine($"            </div>");
+                sb.AppendLine($"        </div>");
+            }
+            sb.AppendLine("    </div>");
+            
+            // Top fejltyper
+            sb.AppendLine("    <div class='summary-card'>");
+            sb.AppendLine("        <h2>Top Fejltyper</h2>");
+            sb.AppendLine("        <table>");
+            sb.AppendLine("            <tr><th>Regel</th><th>Antal</th><th>Impact</th><th>Eksempel URL</th><th>Beskrivelse</th></tr>");
+            foreach (var item in summaryByRule)
+            {
+                sb.AppendLine("            <tr>");
+                sb.AppendLine($"                <td>{item.Rule}</td>");
+                sb.AppendLine($"                <td>{item.Count}</td>");
+                sb.AppendLine($"                <td>{item.Impact}</td>");
+                sb.AppendLine($"                <td><a href='{item.ExampleUrl}' target='_blank'>{item.ExampleUrl}</a></td>");
+                sb.AppendLine($"                <td>{item.ExampleDescription}</td>");
+                sb.AppendLine("            </tr>");
+            }
+            sb.AppendLine("        </table>");
+            sb.AppendLine("    </div>");
+            
+            sb.AppendLine("    <div style='margin-top: 30px; text-align: center; color: #7f8c8d;'>");
+            sb.AppendLine("        Rapport genereret: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            sb.AppendLine("    </div>");
+            
+            sb.AppendLine("</body>");
+            sb.AppendLine("</html>");
+            
+            return sb.ToString();
+        }
+    }
+
+    public class ViolationSummary
+    {
+        public string Rule { get; set; } = string.Empty;
+        public int Count { get; set; }
+        public string Impact { get; set; } = string.Empty;
+        public string ExampleUrl { get; set; } = string.Empty;
+        public string ExampleDescription { get; set; } = string.Empty;
+    }
+
+    public class ImpactSummary
+    {
+        public string Impact { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+}
