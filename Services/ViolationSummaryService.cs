@@ -11,6 +11,14 @@ namespace AccessibilityChecker.Services
 {
     public class ViolationSummaryService
     {
+        private readonly Dictionary<string, int> _impactOrder = new Dictionary<string, int>
+        {
+            { "critical", 0 },
+            { "serious", 1 },
+            { "moderate", 2 },
+            { "minor", 3 }
+        };
+
         public void GenerateHtmlReport(string inputCsvPath, string outputHtmlPath)
         {
             List<AccessibilityViolation> violations;
@@ -30,7 +38,8 @@ namespace AccessibilityChecker.Services
                     ExampleUrl = g.First().Url,
                     ExampleDescription = g.First().Description
                 })
-                .OrderByDescending(x => x.Count)
+                .OrderBy(v => _impactOrder.GetValueOrDefault(v.Impact.ToLower(), 4))
+                .ThenByDescending(x => x.Count)
                 .ToList();
 
             var summaryByImpact = violations
@@ -40,7 +49,7 @@ namespace AccessibilityChecker.Services
                     Impact = g.Key,
                     Count = g.Count()
                 })
-                .OrderByDescending(x => x.Count)
+                .OrderBy(i => _impactOrder.GetValueOrDefault(i.Impact.ToLower(), 4))
                 .ToList();
 
             var totalViolations = violations.Count;
@@ -73,6 +82,7 @@ namespace AccessibilityChecker.Services
             sb.AppendLine("        .impact-critical { background: #ffebee; border-left: 4px solid #e74c3c; }");
             sb.AppendLine("        .impact-serious { background: #fff3e0; border-left: 4px solid #f39c12; }");
             sb.AppendLine("        .impact-moderate { background: #e3f2fd; border-left: 4px solid #3498db; }");
+            sb.AppendLine("        .impact-minor { background: #f0f7f4; border-left: 4px solid #2ecc71; }");
             sb.AppendLine("        table { width: 100%; border-collapse: collapse; margin: 15px 0; }");
             sb.AppendLine("        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }");
             sb.AppendLine("        th { background: #3498db; color: white; }");
@@ -84,6 +94,7 @@ namespace AccessibilityChecker.Services
             sb.AppendLine("        .progress-critical { background: #e74c3c; }");
             sb.AppendLine("        .progress-serious { background: #f39c12; }");
             sb.AppendLine("        .progress-moderate { background: #3498db; }");
+            sb.AppendLine("        .progress-minor { background: #2ecc71; }");
             sb.AppendLine("        .impact-label { font-weight: bold; }");
             sb.AppendLine("    </style>");
             sb.AppendLine("</head>");
@@ -123,7 +134,7 @@ namespace AccessibilityChecker.Services
             
             // Top fejltyper
             sb.AppendLine("    <div class='summary-card'>");
-            sb.AppendLine("        <h2>Top Fejltyper</h2>");
+            sb.AppendLine("        <h2>Fejltyper</h2>");
             sb.AppendLine("        <table>");
             sb.AppendLine("            <tr><th>Regel</th><th>Antal</th><th>Impact</th><th>Eksempel URL</th><th>Beskrivelse</th></tr>");
             foreach (var item in summaryByRule)
