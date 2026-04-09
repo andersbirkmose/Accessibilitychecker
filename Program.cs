@@ -40,7 +40,10 @@ List<string> urlsToScan;
 
 if (settings.UseSitemap)
 {
-    var sitemapUrl = $"{settings.TargetDomain.TrimEnd('/')}/sitemap.xml";
+    var sitemapUrl = !string.IsNullOrEmpty(settings.SitemapUrl)
+        ? settings.SitemapUrl
+        : $"{settings.TargetDomain.TrimEnd('/')}/sitemap.xml";
+    
     Console.WriteLine($"📥 Henter URLs fra sitemap: {sitemapUrl}");
 
     try
