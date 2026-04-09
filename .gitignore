@@ -10,6 +10,7 @@ Secrets.json
 
 # CSV-rapporter
 *.csv
+*.html
 
 # IDE
 .vscode/
