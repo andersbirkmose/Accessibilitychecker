@@ -89,7 +89,7 @@ if (violations.Any())
     using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
     {
         csv.WriteRecords(violations);
-        Console.WriteLine("\n[OK] " + violations.Count + " fejl gemt i " + violationsCsvFile);
+        Console.WriteLine("\n[OK] " + violations.Count + " WCAG-fejl gemt i " + violationsCsvFile);
     }
 
     attachments.Add(violationsCsvFile);
@@ -116,6 +116,10 @@ if (deadLinks.Any())
 
     attachments.Add(deadLinksCsvFile);
 }
+else
+{
+    Console.WriteLine("[OK] Ingen dode links fundet.");
+}
 
 // Eksportér skipped pages
 if (crawler.SkippedPages.Any())
@@ -131,9 +135,16 @@ if (crawler.SkippedPages.Any())
 }
 
 // Send e-mail hvis der er noget at rapportere
-if (attachments.Any())
+if (attachments.Any() || deadLinks.Any() || crawler.SkippedPages.Any())
 {
     var emailService = host.Services.GetRequiredService<EmailService>();
+    
+    // Make sure deadLinksCsvFile is in attachments if there are dead links
+    if (deadLinks.Any() && !attachments.Contains(deadLinksCsvFile))
+    {
+        attachments.Add(deadLinksCsvFile);
+    }
+    
     await emailService.SendReportAsync(
         filePaths: attachments,
         subject: "WCAG-rapport - " + domainName,
@@ -144,10 +155,11 @@ if (attachments.Any())
               "Antal dode links fundet: " + deadLinks.Count + "\n" +
               "Antal sider sprunget over: " + crawler.SkippedPages.Count + "\n\n" +
               "Vedhæftede filer:\n" +
-              "- " + Path.GetFileName(violationsCsvFile) + " (alle WCAG-fejl)\n" +
-              "- " + Path.GetFileName(summaryHtmlFile) + " (HTML-opsummering)\n" +
-              "- " + Path.GetFileName(deadLinksCsvFile) + " (dode links)\n" +
-              "- " + Path.GetFileName(skippedCsvFile) + " (oversprungne sider)\n\n" +
+              (attachments.Contains(violationsCsvFile) ? "- " + Path.GetFileName(violationsCsvFile) + " (alle WCAG-fejl)\n" : "") +
+              (attachments.Contains(summaryHtmlFile) ? "- " + Path.GetFileName(summaryHtmlFile) + " (HTML-opsummering)\n" : "") +
+              (attachments.Contains(deadLinksCsvFile) ? "- " + Path.GetFileName(deadLinksCsvFile) + " (dode links)\n" : "") +
+              (attachments.Contains(skippedCsvFile) ? "- " + Path.GetFileName(skippedCsvFile) + " (oversprungne sider)\n" : "") +
+              "\n" +
               "Mvh,\n" +
               "Din automatiske WCAG-scanner");
 }
