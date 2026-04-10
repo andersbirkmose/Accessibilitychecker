@@ -12,6 +12,7 @@ public class DeadLinkCheckerService
 {
     private readonly HttpClient _httpClient;
     private readonly int _timeoutMs = 10000; // 10 sekunders timeout
+    private readonly HashSet<string> _checkedLinks = new();
 
     public DeadLinkCheckerService()
     {
@@ -40,16 +41,21 @@ public class DeadLinkCheckerService
                 .Where(l => !l.Href.StartsWith("javascript:"))
                 .Where(l => !l.Href.StartsWith("mailto:"))
                 .Where(l => !l.Href.StartsWith("tel:"))
-                .DistinctBy(l => l.Href)
+                .Select(l => new { l.Href, l.Text })
                 .ToList();
 
-            // Check each link
+            // Check each link only if not already checked
             foreach (var link in validLinks)
             {
-                var deadLink = await CheckLinkAsync(pageUrl, link.Href, link.Text);
-                if (deadLink != null)
+                var normalizedUrl = NormalizeUrl(link.Href);
+                if (!_checkedLinks.Contains(normalizedUrl))
                 {
-                    deadLinks.Add(deadLink);
+                    _checkedLinks.Add(normalizedUrl);
+                    var deadLink = await CheckLinkAsync(pageUrl, link.Href, link.Text);
+                    if (deadLink != null)
+                    {
+                        deadLinks.Add(deadLink);
+                    }
                 }
             }
         }
@@ -59,6 +65,19 @@ public class DeadLinkCheckerService
         }
 
         return deadLinks;
+    }
+
+    private string NormalizeUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url))
+            return url;
+        
+        // Remove fragment
+        var uri = new Uri(url, UriKind.RelativeOrAbsolute);
+        if (!uri.IsAbsoluteUri)
+            return url;
+            
+        return new UriBuilder(uri) { Fragment = string.Empty }.Uri.ToString();
     }
 
     private async Task<DeadLink?> CheckLinkAsync(string pageUrl, string linkUrl, string linkText)
@@ -74,7 +93,14 @@ public class DeadLinkCheckerService
                 return null;
 
             // Use HttpClient for faster checks
-            var uri = new Uri(linkUrl);
+            var uri = new Uri(linkUrl, UriKind.RelativeOrAbsolute);
+            if (!uri.IsAbsoluteUri)
+            {
+                // Resolve relative URL
+                var baseUri = new Uri(pageUrl);
+                uri = new Uri(baseUri, uri);
+            }
+
             var response = await _httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, uri), HttpCompletionOption.ResponseHeadersRead);
             
             // If HEAD is not allowed, try GET
