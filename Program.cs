@@ -22,6 +22,7 @@ builder.Services.AddSingleton<AccessibilityAnalyzer>();
 builder.Services.AddSingleton<CrawlerService>();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddSingleton<ViolationSummaryService>();
+builder.Services.AddSingleton<DeadLinkCheckerService>();
 
 var host = builder.Build();
 var settings = host.Services.GetRequiredService<IOptions<AppSettings>>().Value;
@@ -75,6 +76,7 @@ var domainName = new Uri(settings.TargetDomain).Host;
 var dateStamp = DateTime.Now.ToString("yyyy-MM-dd");
 var violationsCsvFile = $"violations-{domainName}-{dateStamp}.csv";
 var skippedCsvFile = $"skipped-{domainName}-{dateStamp}.csv";
+var deadLinksCsvFile = $"deadlinks-{domainName}-{dateStamp}.csv";
 var summaryHtmlFile = $"summary-{domainName}-{dateStamp}.html";
 var attachments = new List<string>();
 
@@ -99,6 +101,20 @@ if (violations.Any())
 else
 {
     Console.WriteLine("\n✅ Ingen WCAG-fejl fundet.");
+}
+
+// Eksportér døde links
+var deadLinks = crawler.AllDeadLinks;
+if (deadLinks.Any())
+{
+    using (var writer = new StreamWriter(deadLinksCsvFile))
+    using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+    {
+        csv.WriteRecords(deadLinks);
+        Console.WriteLine($"📄 {deadLinks.Count} døde links gemt i {deadLinksCsvFile}");
+    }
+
+    attachments.Add(deadLinksCsvFile);
 }
 
 // Eksportér skipped pages
@@ -127,11 +143,13 @@ if (attachments.Any())
         Rapport for domæne: {domainName}
         Antal sider analyseret: {visited.Count}
         Antal tilgængelighedsfejl fundet: {violations.Count}
+        Antal døde links fundet: {deadLinks.Count}
         Antal sider sprunget over: {crawler.SkippedPages.Count}
 
         Vedhæftede filer:
-        - {Path.GetFileName(violationsCsvFile)} (alle fejl)
+        - {Path.GetFileName(violationsCsvFile)} (alle WCAG-fejl)
         - {Path.GetFileName(summaryHtmlFile)} (HTML-opsummering)
+        - {Path.GetFileName(deadLinksCsvFile)} (døde links)
         - {Path.GetFileName(skippedCsvFile)} (oversprungne sider)
 
         Mvh,
