@@ -43,18 +43,18 @@ if (settings.UseSitemap)
 {
     var sitemapUrl = !string.IsNullOrEmpty(settings.SitemapUrl)
         ? settings.SitemapUrl
-        : $"{settings.TargetDomain.TrimEnd('/')}/sitemap.xml";
+        : settings.TargetDomain.TrimEnd('/') + "/sitemap.xml";
     
-    Console.WriteLine($"📥 Henter URLs fra sitemap: {sitemapUrl}");
+    Console.WriteLine("[SITEMAP] Henter URLs fra sitemap: " + sitemapUrl);
 
     try
     {
         urlsToScan = await SitemapHelper.GetUrlsFromSitemapAsync(sitemapUrl);
-        Console.WriteLine($"🔗 Fundet {urlsToScan.Count} links i sitemap\n");
+        Console.WriteLine("[SITEMAP] Fundet " + urlsToScan.Count + " links i sitemap\n");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Kunne ikke hente sitemap: {ex.Message}");
+        Console.WriteLine("[FEJL] Kunne ikke hente sitemap: " + ex.Message);
         return;
     }
 }
@@ -74,10 +74,10 @@ foreach (var url in urlsToScan)
 // Forbered filnavne
 var domainName = new Uri(settings.TargetDomain).Host;
 var dateStamp = DateTime.Now.ToString("yyyy-MM-dd");
-var violationsCsvFile = $"violations-{domainName}-{dateStamp}.csv";
-var skippedCsvFile = $"skipped-{domainName}-{dateStamp}.csv";
-var deadLinksCsvFile = $"deadlinks-{domainName}-{dateStamp}.csv";
-var summaryHtmlFile = $"summary-{domainName}-{dateStamp}.html";
+var violationsCsvFile = "violations-" + domainName + "-" + dateStamp + ".csv";
+var skippedCsvFile = "skipped-" + domainName + "-" + dateStamp + ".csv";
+var deadLinksCsvFile = "deadlinks-" + domainName + "-" + dateStamp + ".csv";
+var summaryHtmlFile = "summary-" + domainName + "-" + dateStamp + ".html";
 var attachments = new List<string>();
 
 // Eksportér violations
@@ -89,7 +89,7 @@ if (violations.Any())
     using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
     {
         csv.WriteRecords(violations);
-        Console.WriteLine($"\n📄 {violations.Count} fejl gemt i {violationsCsvFile}");
+        Console.WriteLine("\n[OK] " + violations.Count + " fejl gemt i " + violationsCsvFile);
     }
 
     attachments.Add(violationsCsvFile);
@@ -100,7 +100,7 @@ if (violations.Any())
 }
 else
 {
-    Console.WriteLine("\n✅ Ingen WCAG-fejl fundet.");
+    Console.WriteLine("\n[OK] Ingen WCAG-fejl fundet.");
 }
 
 // Eksportér døde links
@@ -111,7 +111,7 @@ if (deadLinks.Any())
     using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
     {
         csv.WriteRecords(deadLinks);
-        Console.WriteLine($"📄 {deadLinks.Count} døde links gemt i {deadLinksCsvFile}");
+        Console.WriteLine("[OK] " + deadLinks.Count + " dode links gemt i " + deadLinksCsvFile);
     }
 
     attachments.Add(deadLinksCsvFile);
@@ -124,7 +124,7 @@ if (crawler.SkippedPages.Any())
     using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
     {
         csv.WriteRecords(crawler.SkippedPages);
-        Console.WriteLine($"📄 {crawler.SkippedPages.Count} sider blev sprunget over og gemt i {skippedCsvFile}");
+        Console.WriteLine("[OK] " + crawler.SkippedPages.Count + " sider blev sprunget over og gemt i " + skippedCsvFile);
     }
 
     attachments.Add(skippedCsvFile);
@@ -136,29 +136,24 @@ if (attachments.Any())
     var emailService = host.Services.GetRequiredService<EmailService>();
     await emailService.SendReportAsync(
         filePaths: attachments,
-        subject: $"WCAG-rapport – {domainName}",
-        body: $"""
-        Hej,
-
-        Rapport for domæne: {domainName}
-        Antal sider analyseret: {visited.Count}
-        Antal tilgængelighedsfejl fundet: {violations.Count}
-        Antal døde links fundet: {deadLinks.Count}
-        Antal sider sprunget over: {crawler.SkippedPages.Count}
-
-        Vedhæftede filer:
-        - {Path.GetFileName(violationsCsvFile)} (alle WCAG-fejl)
-        - {Path.GetFileName(summaryHtmlFile)} (HTML-opsummering)
-        - {Path.GetFileName(deadLinksCsvFile)} (døde links)
-        - {Path.GetFileName(skippedCsvFile)} (oversprungne sider)
-
-        Mvh,
-        Din automatiske WCAG-scanner
-        """);
+        subject: "WCAG-rapport - " + domainName,
+        body: "Hej,\n\n" +
+              "Rapport for domæne: " + domainName + "\n" +
+              "Antal sider analyseret: " + visited.Count + "\n" +
+              "Antal tilgængelighedsfejl fundet: " + violations.Count + "\n" +
+              "Antal dode links fundet: " + deadLinks.Count + "\n" +
+              "Antal sider sprunget over: " + crawler.SkippedPages.Count + "\n\n" +
+              "Vedhæftede filer:\n" +
+              "- " + Path.GetFileName(violationsCsvFile) + " (alle WCAG-fejl)\n" +
+              "- " + Path.GetFileName(summaryHtmlFile) + " (HTML-opsummering)\n" +
+              "- " + Path.GetFileName(deadLinksCsvFile) + " (dode links)\n" +
+              "- " + Path.GetFileName(skippedCsvFile) + " (oversprungne sider)\n\n" +
+              "Mvh,\n" +
+              "Din automatiske WCAG-scanner");
 }
 else
 {
-    Console.WriteLine("📭 Ingen filer genereret – e-mail springes over.");
+    Console.WriteLine("[MAIL] Ingen filer genereret - e-mail springes over.");
 }
 
-Console.WriteLine("🏁 Crawling afsluttet.");
+Console.WriteLine("[DONE] Crawling afsluttet.");
