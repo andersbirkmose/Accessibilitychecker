@@ -7,97 +7,97 @@ using AccessibilityChecker.Utils;
 using Microsoft.Extensions.Options;
 using Microsoft.Playwright;
 
-namespace AccessibilityChecker.Services;
-
-public class CrawlerService
+namespace AccessibilityChecker.Services
 {
-    private readonly AppSettings _settings;
-    private readonly AccessibilityAnalyzer _analyzer;
-    private readonly DeadLinkCheckerService _deadLinkChecker;
-
-    public List<AccessibilityViolation> AllViolations { get; } = new();
-    public List<SkippedPage> SkippedPages { get; } = new();
-    public List<DeadLink> AllDeadLinks { get; } = new();
-
-    public CrawlerService(
-        IOptions<AppSettings> settings,
-        AccessibilityAnalyzer analyzer,
-        DeadLinkCheckerService deadLinkChecker)
+    public class CrawlerService
     {
-        _settings = settings.Value;
-        _analyzer = analyzer;
-        _deadLinkChecker = deadLinkChecker;
-    }
+        private readonly AppSettings _settings;
+        private readonly AccessibilityAnalyzer _analyzer;
+        private readonly DeadLinkCheckerService _deadLinkChecker;
 
-    public async Task CrawlAsync(string url, IBrowser browser, HashSet<string> visited, int depth = 0)
-    {
-        var normalizedUrl = UrlHelper.NormalizeUrl(url);
+        public List<AccessibilityViolation> AllViolations { get; } = new();
+        public List<SkippedPage> SkippedPages { get; } = new();
+        public List<DeadLink> AllDeadLinks { get; } = new();
 
-        if (depth > _settings.MaxDepth 
-            || visited.Contains(normalizedUrl) 
-            || IsExcluded(normalizedUrl) 
-            || ExcludeFiles.IsFileUrl(normalizedUrl))
-            return;
-
-        if (visited.Count >= _settings.MaxPages)
-            return;
-
-        visited.Add(normalizedUrl);
-
-        try
+        public CrawlerService(
+            IOptions<AppSettings> settings,
+            AccessibilityAnalyzer analyzer,
+            DeadLinkCheckerService deadLinkChecker)
         {
-            Console.WriteLine($"\n🔍 {DateTime.Now:T} - Analyserer: {normalizedUrl}");
+            _settings = settings.Value;
+            _analyzer = analyzer;
+            _deadLinkChecker = deadLinkChecker;
+        }
 
-            await using var context = await browser.NewContextAsync();
-            var page = await context.NewPageAsync();
+        public async Task CrawlAsync(string url, IBrowser browser, HashSet<string> visited, int depth = 0)
+        {
+            var normalizedUrl = UrlHelper.NormalizeUrl(url);
 
-            // Check for dead links on this page
-            var deadLinks = await _deadLinkChecker.CheckPageForDeadLinksAsync(normalizedUrl, page);
-            AllDeadLinks.AddRange(deadLinks);
-            if (deadLinks.Any())
+            if (depth > _settings.MaxDepth 
+                || visited.Contains(normalizedUrl) 
+                || IsExcluded(normalizedUrl) 
+                || ExcludeFiles.IsFileUrl(normalizedUrl))
+                return;
+
+            if (visited.Count >= _settings.MaxPages)
+                return;
+
+            visited.Add(normalizedUrl);
+
+            try
             {
-                Console.WriteLine($"   💀 Fundet {deadLinks.Count} døde links på {normalizedUrl}");
-            }
+                Console.WriteLine("\n[" + DateTime.Now.ToString("T") + "] - Analyserer: " + normalizedUrl);
 
-            var (violations, skipReason) = await _analyzer.AnalyzeAsync(normalizedUrl, browser);
+                await using var context = await browser.NewContextAsync();
+                var page = await context.NewPageAsync();
 
-            if (!string.IsNullOrEmpty(skipReason))
-            {
-                SkippedPages.Add(new SkippedPage
+                // Check for dead links on this page
+                var deadLinks = await _deadLinkChecker.CheckPageForDeadLinksAsync(normalizedUrl, page);
+                AllDeadLinks.AddRange(deadLinks);
+                if (deadLinks.Any())
                 {
-                    Url = normalizedUrl,
-                    Reason = skipReason
-                });
-            }
-            else
-            {
-                AllViolations.AddRange(violations);
-            }
-
-            await page.GotoAsync(normalizedUrl);
-
-            var hrefs = await page.EvaluateAsync<string[]>(
-                @"Array.from(document.querySelectorAll('a')).map(a => a.href)");
-
-            foreach (var link in hrefs)
-            {
-                var normalizedLink = UrlHelper.NormalizeUrl(link);
-                if (normalizedLink.StartsWith(_settings.TargetDomain)
-                    && !ExcludeFiles.IsFileUrl(normalizedLink))
-                {
-                    await CrawlAsync(normalizedLink, browser, visited, depth + 1);
+                    Console.WriteLine("   [DEAD LINKS] Fundet " + deadLinks.Count + " dode links pa " + normalizedUrl);
                 }
+
+                var (violations, skipReason) = await _analyzer.AnalyzeAsync(normalizedUrl, browser);
+
+                if (!string.IsNullOrEmpty(skipReason))
+                {
+                    SkippedPages.Add(new SkippedPage
+                    {
+                        Url = normalizedUrl,
+                        Reason = skipReason
+                    });
+                }
+                else
+                {
+                    AllViolations.AddRange(violations);
+                }
+
+                await page.GotoAsync(normalizedUrl);
+
+                var hrefs = await page.EvaluateAsync<string[]>(@"Array.from(document.querySelectorAll('a')).map(a => a.href)");
+
+                foreach (var link in hrefs)
+                {
+                    var normalizedLink = UrlHelper.NormalizeUrl(link);
+                    if (normalizedLink.StartsWith(_settings.TargetDomain)
+                        && !ExcludeFiles.IsFileUrl(normalizedLink))
+                    {
+                        await CrawlAsync(normalizedLink, browser, visited, depth + 1);
+                    }
+                }
+
             }
-
+            catch (Exception ex)
+            {
+                Console.WriteLine("[FEJL] Ved " + normalizedUrl + ": " + ex.Message);
+            }
         }
-        catch (Exception ex)
+
+        private bool IsExcluded(string url)
         {
-            Console.WriteLine($"⚠️ Fejl ved {normalizedUrl}: {ex.Message}");
+            return _settings.ExcludedPaths.Any(p => url.Contains(p, StringComparison.OrdinalIgnoreCase));
         }
-    }
-
-    private bool IsExcluded(string url)
-    {
-        return _settings.ExcludedPaths.Any(p => url.Contains(p, StringComparison.OrdinalIgnoreCase));
     }
 }
