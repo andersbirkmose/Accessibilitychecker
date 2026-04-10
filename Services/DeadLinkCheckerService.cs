@@ -26,12 +26,8 @@ namespace AccessibilityChecker.Services
 
             try
             {
-                var links = await page.EvaluateAsync<LinkData[]>("() => {
-                    return Array.from(document.querySelectorAll('a[href]')).map(a => ({
-                        href: a.href,
-                        text: a.innerText.trim().substring(0, 100)
-                    }));
-                }");
+                var links = await page.EvaluateAsync<LinkData[]>(
+                    "() => Array.from(document.querySelectorAll('a[href]')).map(a => ({ href: a.href, text: a.innerText.trim().substring(0, 100) }))");
 
                 var validLinks = links
                     .Where(l => !string.IsNullOrEmpty(l.Href))
