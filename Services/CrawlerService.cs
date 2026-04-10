@@ -51,7 +51,11 @@ namespace AccessibilityChecker.Services
                 await using var context = await browser.NewContextAsync();
                 var page = await context.NewPageAsync();
 
-                // Check for dead links on this page
+                // Navigate to the page first and wait for it to load
+                await page.GotoAsync(normalizedUrl);
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+                // Now check for dead links on this fully loaded page
                 var deadLinks = await _deadLinkChecker.CheckPageForDeadLinksAsync(normalizedUrl, page);
                 AllDeadLinks.AddRange(deadLinks);
                 if (deadLinks.Any())
@@ -78,8 +82,7 @@ namespace AccessibilityChecker.Services
                     AllViolations.AddRange(violations);
                 }
 
-                await page.GotoAsync(normalizedUrl);
-
+                // Get all links for crawling
                 var hrefs = await page.EvaluateAsync<string[]>(@"Array.from(document.querySelectorAll('a')).map(a => a.href)");
 
                 foreach (var link in hrefs)
