@@ -13,14 +13,20 @@ public class CrawlerService
 {
     private readonly AppSettings _settings;
     private readonly AccessibilityAnalyzer _analyzer;
+    private readonly DeadLinkCheckerService _deadLinkChecker;
 
     public List<AccessibilityViolation> AllViolations { get; } = new();
     public List<SkippedPage> SkippedPages { get; } = new();
+    public List<DeadLink> AllDeadLinks { get; } = new();
 
-    public CrawlerService(IOptions<AppSettings> settings, AccessibilityAnalyzer analyzer)
+    public CrawlerService(
+        IOptions<AppSettings> settings,
+        AccessibilityAnalyzer analyzer,
+        DeadLinkCheckerService deadLinkChecker)
     {
         _settings = settings.Value;
         _analyzer = analyzer;
+        _deadLinkChecker = deadLinkChecker;
     }
 
     public async Task CrawlAsync(string url, IBrowser browser, HashSet<string> visited, int depth = 0)
@@ -42,6 +48,17 @@ public class CrawlerService
         {
             Console.WriteLine($"\n🔍 {DateTime.Now:T} - Analyserer: {normalizedUrl}");
 
+            await using var context = await browser.NewContextAsync();
+            var page = await context.NewPageAsync();
+
+            // Check for dead links on this page
+            var deadLinks = await _deadLinkChecker.CheckPageForDeadLinksAsync(normalizedUrl, page);
+            AllDeadLinks.AddRange(deadLinks);
+            if (deadLinks.Any())
+            {
+                Console.WriteLine($"   💀 Fundet {deadLinks.Count} døde links på {normalizedUrl}");
+            }
+
             var (violations, skipReason) = await _analyzer.AnalyzeAsync(normalizedUrl, browser);
 
             if (!string.IsNullOrEmpty(skipReason))
@@ -57,8 +74,6 @@ public class CrawlerService
                 AllViolations.AddRange(violations);
             }
 
-            await using var context = await browser.NewContextAsync();
-            var page = await context.NewPageAsync();
             await page.GotoAsync(normalizedUrl);
 
             var hrefs = await page.EvaluateAsync<string[]>(
