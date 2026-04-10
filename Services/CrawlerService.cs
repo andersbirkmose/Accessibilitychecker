@@ -57,6 +57,10 @@ namespace AccessibilityChecker.Services
                 if (deadLinks.Any())
                 {
                     Console.WriteLine("   [DEAD LINKS] Fundet " + deadLinks.Count + " dode links pa " + normalizedUrl);
+                    foreach (var dl in deadLinks)
+                    {
+                        Console.WriteLine("     - " + dl.LinkUrl + " (" + dl.StatusCode + ": " + dl.Reason + ")");
+                    }
                 }
 
                 var (violations, skipReason) = await _analyzer.AnalyzeAsync(normalizedUrl, browser);
