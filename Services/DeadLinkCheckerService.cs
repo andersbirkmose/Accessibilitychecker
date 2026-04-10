@@ -29,6 +29,8 @@ namespace AccessibilityChecker.Services
                 var links = await page.EvaluateAsync<LinkData[]>(
                     "() => Array.from(document.querySelectorAll('a[href]')).map(a => ({ href: a.href, text: a.innerText.trim().substring(0, 100) }))");
 
+                Console.WriteLine("[DEBUG] Found " + links.Length + " links on page: " + pageUrl);
+
                 var validLinks = links
                     .Where(l => !string.IsNullOrEmpty(l.Href))
                     .Where(l => !l.Href.StartsWith("#"))
@@ -38,23 +40,31 @@ namespace AccessibilityChecker.Services
                     .Select(l => new { l.Href, l.Text })
                     .ToList();
 
+                Console.WriteLine("[DEBUG] " + validLinks.Count + " valid links to check after filtering");
+
                 foreach (var link in validLinks)
                 {
                     var normalizedUrl = NormalizeUrl(link.Href);
                     if (!_checkedLinks.Contains(normalizedUrl))
                     {
                         _checkedLinks.Add(normalizedUrl);
+                        Console.WriteLine("[DEBUG] Checking link: " + normalizedUrl);
                         var deadLink = await CheckLinkAsync(pageUrl, link.Href, link.Text);
                         if (deadLink != null)
                         {
                             deadLinks.Add(deadLink);
+                            Console.WriteLine("[DEBUG] Found dead link: " + deadLink.LinkUrl + " (" + deadLink.StatusCode + ": " + deadLink.Reason + ")");
                         }
+                    }
+                    else
+                    {
+                        Console.WriteLine("[DEBUG] Skipping already checked link: " + normalizedUrl);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("FEJL ved tjek af dode links pa " + pageUrl + ": " + ex.Message);
+                Console.WriteLine("[FEJL] ved tjek af dode links pa " + pageUrl + ": " + ex.Message);
             }
 
             return deadLinks;
@@ -67,15 +77,20 @@ namespace AccessibilityChecker.Services
 
             try
             {
-                var uri = new Uri(url, UriKind.RelativeOrAbsolute);
-                if (!uri.IsAbsoluteUri)
+                // Handle URLs that might be relative or have fragments
+                if (url.StartsWith("#"))
                     return url;
 
-                return new UriBuilder(uri) { Fragment = string.Empty }.Uri.ToString();
+                var uri = new Uri(url, UriKind.RelativeOrAbsolute);
+                if (!uri.IsAbsoluteUri)
+                    return url.ToLower(); // For relative URLs, just use as-is for now
+
+                // For absolute URLs, remove fragment and normalize to lowercase
+                return new UriBuilder(uri) { Fragment = string.Empty }.Uri.ToString().ToLower();
             }
             catch
             {
-                return url;
+                return url.ToLower();
             }
         }
 
@@ -94,16 +109,21 @@ namespace AccessibilityChecker.Services
                 {
                     var baseUri = new Uri(pageUrl);
                     uri = new Uri(baseUri, uri);
+                    linkUrl = uri.ToString();
                 }
 
-                var response = await _httpClient.SendAsync(
-                    new HttpRequestMessage(HttpMethod.Head, uri),
-                    HttpCompletionOption.ResponseHeadersRead);
+                // Configure request to follow redirects
+                var request = new HttpRequestMessage(HttpMethod.Head, uri);
+                var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
+                // If HEAD is not allowed, try GET
                 if (response.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed)
                 {
-                    response = await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+                    request = new HttpRequestMessage(HttpMethod.Get, uri);
+                    response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                 }
+
+                Console.WriteLine("[DEBUG] Link " + linkUrl + " status: " + (int)response.StatusCode);
 
                 if ((int)response.StatusCode >= 400)
                 {
@@ -119,6 +139,7 @@ namespace AccessibilityChecker.Services
             }
             catch (HttpRequestException ex)
             {
+                Console.WriteLine("[DEBUG] HttpRequestException for " + linkUrl + ": " + ex.Message);
                 return new DeadLink
                 {
                     PageUrl = pageUrl,
@@ -130,10 +151,12 @@ namespace AccessibilityChecker.Services
             }
             catch (UriFormatException)
             {
+                Console.WriteLine("[DEBUG] Invalid URL format: " + linkUrl);
                 return null;
             }
             catch (TaskCanceledException)
             {
+                Console.WriteLine("[DEBUG] Request timed out for: " + linkUrl);
                 return new DeadLink
                 {
                     PageUrl = pageUrl,
@@ -143,8 +166,9 @@ namespace AccessibilityChecker.Services
                     Reason = "Request timed out"
                 };
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Console.WriteLine("[DEBUG] General exception for " + linkUrl + ": " + ex.Message);
                 return null;
             }
 
